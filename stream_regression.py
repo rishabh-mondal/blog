@@ -13,7 +13,68 @@ import streamlit as st
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import KFold
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+alt.themes.enable('dark')
+st.markdown("""
+<style>
+body {
+    color: #333;
+    font-family: 'Helvetica', 'Arial', sans-serif;
+}
 
+header {
+    background-color: #333;
+    padding: 20px;
+    text-align: center;
+}
+
+h1, h2 {
+    color: #FF6600;
+}
+
+.container {
+    max-width: 800px;
+    margin: auto;
+    padding: 20px;
+}
+
+.stButton button {
+    background-color: #FF6600;
+    color: #fff;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.stButton button:hover {
+    background-color: #E64A00;
+}
+
+.stCheckbox label {
+    font-size: 18px;
+    color: #666;
+}
+
+.stHeader {
+    background-color: #FF6600;
+    color: #fff;
+    padding: 10px;
+    text-align: center;
+    border-radius: 5px;
+    margin-top: 20px;
+}
+
+.stDataFrame {
+    background-color: #fff;
+    color: #333;
+}
+
+.stAltairChart {
+    margin-top: 20px;
+}
+</style>
+""", unsafe_allow_html=True)
 
 def read_data(file):
     if file is not None:
@@ -26,8 +87,7 @@ uploaded_file = st.file_uploader("Choose a file", type=["csv", "xlsx"])
 data = read_data(uploaded_file)
 
 
-st.header("Model Configuration")
-
+st.markdown("### Model Configuration")
 
 slope = st.slider("Slope", -5.0, 5.0, 1.0)
 
@@ -43,19 +103,27 @@ else:
 
 model.fit(X, slope * X + intercept)
 
-st.header("Data Visualization")
-df = pd.DataFrame({'X': X.flatten(), 'y': model.predict(X).flatten()})
-regression_plot = alt.Chart(df).mark_line(color='red').encode(
-    x='X',
-    y='y',
-)
+st.markdown("### Data Visualization")
 
-data_plot = alt.Chart(df).mark_circle(size=60).encode(
+df = pd.DataFrame({'X': X.flatten(), 'y': model.predict(X).flatten()})
+regression_plot = alt.Chart(df).mark_line(color='#FF6600', size=3).encode(
     x='X',
     y='y',
-)
+    opacity=alt.condition(alt.datum.y != 0, alt.value(0.8), alt.value(0)),  # Set line transparency
+    tooltip=['X', 'y']
+).interactive()
+data_plot = alt.Chart(df).mark_circle(size=60, opacity=0.8, color='#3366CC').encode(
+    x='X',
+    y='y',
+    tooltip=['X', 'y']
+).properties(
+    title='Scatter Plot with Regression Line',
+    width=600,
+    height=400
+).interactive()
 
 st.altair_chart(data_plot + regression_plot, use_container_width=True)
+st.markdown("### Additional Options")
 
 if st.checkbox("Show Table"):
     st.dataframe(df)
