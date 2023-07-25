@@ -11,8 +11,9 @@ from mpl_toolkits.mplot3d import Axes3D
 import streamlit as st
 # Model
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import KFold
-from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
+
 alt.themes.enable('dark')
 st.markdown("""
 <style>
@@ -76,107 +77,118 @@ h1, h2 {
 </style>
 """, unsafe_allow_html=True)
 
-def read_data(file):
-    if file is not None:
-        df = pd.read_csv(file)
-        return df
-    return None
+def generate_data_linear(seed, slope, intercept, num_data_points):
+    rng = np.random.RandomState(seed)
+    x = 10 * rng.rand(num_data_points) + 0.3 * rng.randn(num_data_points)  # Adding noise to 'x'
+    y = slope * x + intercept + rng.randn(num_data_points)
+    return x, y
 
-st.subheader("Upload Data File (CSV or Excel)")
-uploaded_file = st.file_uploader("Choose a file", type=["csv", "xlsx"])
-data = read_data(uploaded_file)
+def generate_data_sine(seed, slope, intercept, num_data_points):
+    rng = np.random.RandomState(seed)
+    x = 10 * rng.rand(num_data_points) + rng.randn(num_data_points)  # Adding noise to 'x'
+    y = np.sin(x) + 0.3 * rng.randn(num_data_points)
+    return x, y
 
+def generate_data_exponential(seed, slope, intercept, num_data_points):
+    rng = np.random.RandomState(seed)
+    x = 10 * rng.rand(num_data_points) + rng.randn(num_data_points)  # Adding noise to 'x'
+    y = np.exp(x) + 0.3 * rng.randn(num_data_points)
+    return x, y
 
-st.markdown("### Model Configuration")
+def generate_data_polynomial(seed, slope, intercept, num_data_points):
+    rng = np.random.RandomState(seed)
+    x = 10 * rng.rand(num_data_points) + rng.randn(num_data_points)  # Adding noise to 'x'
+    y = slope * x**2 + intercept + rng.randn(num_data_points)
+    return x, y
 
-slope = st.slider("Slope", -5.0, 5.0, 1.0)
+def generate_data_gaussian_process(seed, slope, intercept, num_data_points):
+    rng = np.random.RandomState(seed)
+    x = 10 * rng.rand(num_data_points)
+    y = slope * x + intercept + rng.randn(num_data_points)  # Adding noise to 'y'
+    
+    # Use Gaussian Process Regressor to generate data
+    kernel = C() * RBF()
+    gp = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=10, random_state=seed)
+    gp.fit(x[:, np.newaxis], y)
+    yfit = gp.predict(np.linspace(0, 10, num_data_points)[:, np.newaxis])
+    return x,y
 
-intercept = st.slider("Intercept", -50.0, 50.0, 0.0)
-model=LinearRegression()
-if data is not None:
-    X = data.iloc[:, 0].values.reshape(-1, 1)
-    y = data.iloc[:, 1].values
+# Slider Section
+seed = st.slider("Random seed", 1, 50, 10)
+slope = st.slider("Slope", -10.0, 10.0, 2.0, 0.1)
+intercept = st.slider("Intercept", -10.0, 10.0, -5.0, 0.1)
+num_data_points = st.slider("Number of Data Points", 10, 5000, 50)
+
+# Checkbox Section for selecting data generation functions
+st.markdown("### Data Generation Functions")
+generate_linear = st.checkbox("Linear Function")
+generate_sine = st.checkbox("Sine Function")
+generate_exponential = st.checkbox("Exponential Function")
+generate_polynomial = st.checkbox("Polynomial Function")
+generate_gaussian_process = st.checkbox("Gaussian Process Function")
+
+# Generate data based on the selected functions
+x, y = [], []
+
+if generate_linear:
+    x_temp, y_temp = generate_data_linear(seed, slope, intercept, num_data_points)
+    x.extend(x_temp)
+    y.extend(y_temp)
+
+if generate_sine:
+    x_temp, y_temp = generate_data_sine(seed, slope, intercept, num_data_points)
+    x.extend(x_temp)
+    y.extend(y_temp)
+
+if generate_exponential:
+    x_temp, y_temp = generate_data_exponential(seed, slope, intercept, num_data_points)
+    x.extend(x_temp)
+    y.extend(y_temp)
+
+if generate_polynomial:
+    x_temp, y_temp = generate_data_polynomial(seed, slope, intercept, num_data_points)
+    x.extend(x_temp)
+    y.extend(y_temp)
+
+if generate_gaussian_process:
+    x_temp, y_temp = generate_data_gaussian_process(seed, slope, intercept, num_data_points)
+    x.extend(x_temp)
+    y.extend(y_temp)
+
+if len(x) > 0:
+    # Create DataFrame for the scatter plot
+    data = pd.DataFrame({'x': x, 'y': y})
+
+    # Create linear regression model
+    model = LinearRegression(fit_intercept=True)
+    model.fit(np.array(x)[:, np.newaxis], y)
+
+    # Generate data points for regression line
+    xfit = np.linspace(0, 10, 1000)
+    yfit = model.predict(xfit[:, np.newaxis])
+
+    # Scatter plot using Altair
+    scatter_plot = alt.Chart(data).mark_circle(size=60, color='steelblue').encode(
+        x='x',
+        y='y',
+        tooltip=['x', 'y']
+    ).interactive()
+
+    # Line chart for the regression line using Altair
+    regression_line_chart = alt.Chart(pd.DataFrame({'x': xfit, 'y': yfit})).mark_line(
+        color='orange', strokeWidth=2
+    ).encode(
+        x='x',
+        y='y'
+    )
+
+    # Combine the scatter plot and regression line chart using Altair
+    combined_chart = (scatter_plot + regression_line_chart).properties(
+        width=600,
+        height=400
+    )
+
+    # Show the combined chart
+    st.altair_chart(combined_chart)
 else:
-    np.random.seed(0)
-    X = np.random.rand(100, 1)
-    y = slope * X + intercept
-
-model.fit(X, slope * X + intercept)
-
-st.markdown("### Data Visualization")
-
-df = pd.DataFrame({'X': X.flatten(), 'y': model.predict(X).flatten()})
-regression_plot = alt.Chart(df).mark_line(color='#FF6600', size=3).encode(
-    x='X',
-    y='y',
-    opacity=alt.condition(alt.datum.y != 0, alt.value(0.8), alt.value(0)),  # Set line transparency
-    tooltip=['X', 'y']
-).interactive()
-data_plot = alt.Chart(df).mark_circle(size=60, opacity=0.8, color='#3366CC').encode(
-    x='X',
-    y='y',
-    tooltip=['X', 'y']
-).properties(
-    title='Scatter Plot with Regression Line',
-    width=600,
-    height=400
-).interactive()
-
-st.altair_chart(data_plot + regression_plot, use_container_width=True)
-st.markdown("### Additional Options")
-
-if st.checkbox("Show Table"):
-    st.dataframe(df)
-
-if st.checkbox("Show Regression Plot"):
-    st.altair_chart(regression_plot, use_container_width=True)
-
-if st.checkbox("Show Histogram"):
-    st.write("Histogram of y:")
-    fig, ax = plt.subplots()
-    ax.hist(y, bins=20, color='skyblue')
-    st.pyplot(fig)
-
-if st.checkbox("Show 3D Plot"):
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(X, y, model.predict(X), c='r', marker='o')
-    ax.set_xlabel('X')
-    ax.set_ylabel('y')
-    ax.set_zlabel('Predicted y')
-    ax.set_title('3D Scatter Plot')
-    st.pyplot(fig)
-
-if st.checkbox("Perform KFold"):
-    kfold = KFold(n_splits=5, shuffle=True, random_state=0)  # Set the number of folds
-    scores = []
-    for train_index, test_index in kfold.split(X):
-        X_train, X_test = X[train_index], X[test_index]
-        y_train, y_test = y[train_index], y[test_index]
-        model.fit(X_train, y_train)
-        y_pred = model.predict(X_test)
-
-        r2 = r2_score(y_test, y_pred)
-        mae = mean_absolute_error(y_test, y_pred)
-        mse = mean_squared_error(y_test, y_pred)
-        scores.append((r2, mae, mse))
-
-    scores_df = pd.DataFrame(scores, columns=['R-squared', 'MAE', 'MSE'])
-    st.subheader("KFold Analysis")
-    st.dataframe(scores_df)
-st.header("Predictions")
-st.subheader("Choose X Value")
-x_input = st.number_input("Enter a value for X:", value=0.5, step=0.1)
-
-# Increase and decrease buttons for X value
-col1, col2, col3 = st.columns([1, 1, 1])
-if col2.button("Increase X"):
-    x_input += 0.1
-if col2.button("Decrease X"):
-    x_input -= 0.1
-
-prediction = model.predict([[x_input]])[0][0]
-st.write(f"For X = {x_input:.2f}, the predicted y is {prediction:.2f}")
-
-
-
+    st.write("Please select at least one data generation function.")
