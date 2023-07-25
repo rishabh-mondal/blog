@@ -1,12 +1,8 @@
 # Numerical analysis
 import numpy as np
 import pandas as pd
-
 #visualization
-import matplotlib.pyplot as plt
 import altair as alt
-from mpl_toolkits.mplot3d import Axes3D
-
 #streamlit platform 
 import streamlit as st
 # Model
