@@ -7,8 +7,11 @@ import altair as alt
 import streamlit as st
 # Model
 from sklearn.linear_model import LinearRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import PolynomialFeatures
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
+from sklearn.metrics import mean_squared_error
 
 alt.themes.enable('dark')
 st.markdown("""
@@ -114,14 +117,26 @@ seed = st.slider("Random seed", 1, 50, 10)
 slope = st.slider("Slope", -10.0, 10.0, 2.0, 0.1)
 intercept = st.slider("Intercept", -10.0, 10.0, -5.0, 0.1)
 num_data_points = st.slider("Number of Data Points", 10, 5000, 50)
+col1, col2 = st.columns(2)
 
 # Checkbox Section for selecting data generation functions
-st.markdown("### Data Generation Functions")
-generate_linear = st.checkbox("Linear Function")
-generate_sine = st.checkbox("Sine Function")
-generate_exponential = st.checkbox("Exponential Function")
-generate_polynomial = st.checkbox("Polynomial Function")
-generate_gaussian_process = st.checkbox("Gaussian Process Function")
+with col1:
+    st.markdown("### Data Generation Functions")
+    generate_linear = st.checkbox("Linear Function")
+    generate_sine = st.checkbox("Sine Function")
+    generate_exponential = st.checkbox("Exponential Function")
+    generate_polynomial = st.checkbox("Polynomial Function")
+    generate_gaussian_process = st.checkbox("Gaussian Process Function")
+
+# Section for Regression Line Function Selection
+with col2:
+    st.markdown("### Regression Line Function")
+    poly_regression = st.checkbox("Polynomial Regression (Degree 7)")
+    rbf_regression = st.checkbox("RBF Regression (Gaussian Process)")
+
+if poly_regression:
+    poly_degree = st.slider("Polynomial Degree", 1, 20, 7, key='poly_degree')
+
 
 # Generate data based on the selected functions
 x, y = [], []
@@ -155,8 +170,13 @@ if len(x) > 0:
     # Create DataFrame for the scatter plot
     data = pd.DataFrame({'x': x, 'y': y})
 
-    # Create linear regression model
-    model = LinearRegression(fit_intercept=True)
+    if poly_regression:
+        model = make_pipeline(PolynomialFeatures(degree=7), LinearRegression(fit_intercept=True))
+    elif rbf_regression:
+        kernel = C() * RBF()
+        model = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=10, random_state=seed)
+    else:
+        model = LinearRegression(fit_intercept=True)
     model.fit(np.array(x)[:, np.newaxis], y)
 
     # Generate data points for regression line
@@ -186,5 +206,17 @@ if len(x) > 0:
 
     # Show the combined chart
     st.altair_chart(combined_chart)
+     # Make predictions on the data
+    y_pred = model.predict(np.array(x)[:, np.newaxis])
+
+    # Calculate Mean Squared Error (MSE)
+    mse = mean_squared_error(y, y_pred)
+
+    # Calculate Root Mean Squared Error (RMSE)
+    rmse = np.sqrt(mse)
+
+    # Display MSE and RMSE in a box
+    st.info(f"MSE: {mse:.4f}")
+    st.info(f"RMSE: {rmse:.4f}")   
 else:
     st.write("Please select at least one data generation function.")
