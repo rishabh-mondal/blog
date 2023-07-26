@@ -171,7 +171,7 @@ if len(x) > 0:
     data = pd.DataFrame({'x': x, 'y': y})
 
     if poly_regression:
-        model = make_pipeline(PolynomialFeatures(degree=7), LinearRegression(fit_intercept=True))
+        model = make_pipeline(PolynomialFeatures(degree=poly_degree), LinearRegression(fit_intercept=True))
     elif rbf_regression:
         kernel = C() * RBF()
         model = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=10, random_state=seed)
